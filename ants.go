@@ -30,144 +30,144 @@ import (
 )
 
 const (
-	// DefaultAntsPoolSize is the default capacity for a default goroutine pool.
+	// DefaultAntsPoolSize是默认goroutine池的默认容量
 	DefaultAntsPoolSize = math.MaxInt32
 
-	// DefaultCleanIntervalTime is the interval time to clean up goroutines.
+	// DefaultCleanIntervalTime是清理goroutine的间隔时间。
 	DefaultCleanIntervalTime = time.Second
 
-	// CLOSED represents that the pool is closed.
+	// CLOSED表示该池已关闭。
 	CLOSED = 1
 )
 
 var (
-	// Error types for the Ants API.
-	//---------------------------------------------------------------------------
+	// Ants API的错误类型。
+	// ------------------------------------------------ ---------------------------
 
-	// ErrInvalidPoolSize will be returned when setting a negative number as pool capacity.
+	//将负数设置为池容量时，将返回ErrInvalidPoolSize。
 	ErrInvalidPoolSize = errors.New("invalid size for pool")
 
-	// ErrLackPoolFunc will be returned when invokers don't provide function for pool.
+	//当调用者不提供池功能时，将返回ErrLackPoolFunc。
 	ErrLackPoolFunc = errors.New("must provide function for pool")
 
-	// ErrInvalidPoolExpiry will be returned when setting a negative number as the periodic duration to purge goroutines.
+	//将负数设置为清除goroutine的定期持续时间时，将返回ErrInvalidPoolExpiry。
 	ErrInvalidPoolExpiry = errors.New("invalid expiry for pool")
 
-	// ErrPoolClosed will be returned when submitting task to a closed pool.
+	//将任务提交到封闭池时，将返回ErrPoolClosed。
 	ErrPoolClosed = errors.New("this pool has been closed")
 
-	// ErrPoolOverload will be returned when the pool is full and no workers available.
+	//当池已满且没有可用的工作程序时，将返回ErrPoolOverload。
 	ErrPoolOverload = errors.New("too many goroutines blocked on submit or Nonblocking is set")
 	//---------------------------------------------------------------------------
 
-	// workerChanCap determines whether the channel of a worker should be a buffered channel
-	// to get the best performance. Inspired by fasthttp at https://github.com/valyala/fasthttp/blob/master/workerpool.go#L139
+	// workerChanCap确定worker的通道是否应为缓冲通道
+	//以获得最佳性能。受到fasthttp的启发，网址为https://github.com/valyala/fasthttp/blob/master/workerpool.go#L139
 	workerChanCap = func() int {
-		// Use blocking workerChan if GOMAXPROCS=1.
-		// This immediately switches Serve to WorkerFunc, which results
-		// in higher performance (under go1.5 at least).
+		//如果GOMAXPROCS = 1，则使用阻塞workerChan。
+		//这会立即将Serve切换到WorkerFunc，结果
+		//性能更高（至少在go1.5以下）。
 		if runtime.GOMAXPROCS(0) == 1 {
 			return 0
 		}
 
-		// Use non-blocking workerChan if GOMAXPROCS>1,
-		// since otherwise the Serve caller (Acceptor) may lag accepting
-		// new connections if WorkerFunc is CPU-bound.
+		//如果GOMAXPROCS> 1，请使用非阻塞workerChan，
+		//因为否则，服务调用方（接受方）可能会滞后于接受
+		//如果WorkerFunc受CPU限制，则为新连接。
 		return 1
 	}()
 
-	// Init a instance pool when importing ants.
+	//导入蚂蚁时初始化实例池。
 	defaultAntsPool, _ = NewPool(DefaultAntsPoolSize)
 )
 
-// Option represents the optional function.
+// Option表示可选功能。
 type Option func(opts *Options)
 
-// Options contains all options which will be applied when instantiating a ants pool.
+//选项包含实例化蚂蚁池时将应用的所有选项。
 type Options struct {
-	// ExpiryDuration set the expired time (second) of every worker.
+	// ExpiryDuration设置每个工作人员的过期时间（秒）。
 	ExpiryDuration time.Duration
 
-	// PreAlloc indicate whether to make memory pre-allocation when initializing Pool.
+	// PreAlloc指示在初始化Pool时是否对内存进行预分配。
 	PreAlloc bool
 
-	// Max number of goroutine blocking on pool.Submit.
-	// 0 (default value) means no such limit.
+	//在pool.Submit上阻止goroutine的最大数量。
+	// 0（默认值）表示没有此限制。
 	MaxBlockingTasks int
 
-	// When Nonblocking is true, Pool.Submit will never be blocked.
-	// ErrPoolOverload will be returned when Pool.Submit cannot be done at once.
-	// When Nonblocking is true, MaxBlockingTasks is inoperative.
+	//当Nonblocking为true时，Pool.Submit将永远不会被阻塞。
+	//当无法一次完成Pool.Submit时，将返回ErrPoolOverload。
+	//当Nonblocking为true时，MaxBlockingTasks不起作用。
 	Nonblocking bool
 
-	// PanicHandler is used to handle panics from each worker goroutine.
-	// if nil, panics will be thrown out again from worker goroutines.
+	// PanicHandler用于处理每个工作程序goroutine中的恐慌。
+	//如果为零，恐慌将再次从工作人员goroutine中抛出。
 	PanicHandler func(interface{})
 }
 
-// WithOptions accepts the whole options config.
+// WithOptions接受整个选项配置。
 func WithOptions(options Options) Option {
 	return func(opts *Options) {
 		*opts = options
 	}
 }
 
-// WithExpiryDuration sets up the interval time of cleaning up goroutines.
+// WithExpiryDuration设置清理goroutine的间隔时间。
 func WithExpiryDuration(expiryDuration time.Duration) Option {
 	return func(opts *Options) {
 		opts.ExpiryDuration = expiryDuration
 	}
 }
 
-// WithPreAlloc indicates whether it should malloc for workers.
+// WithPreAlloc指示是否应为工作者malloc。
 func WithPreAlloc(preAlloc bool) Option {
 	return func(opts *Options) {
 		opts.PreAlloc = preAlloc
 	}
 }
 
-// WithMaxBlockingTasks sets up the maximum number of goroutines that are blocked when it reaches the capacity of pool.
+// WithMaxBlockingTasks设置在达到池的容量时被阻止的goroutine的最大数量。
 func WithMaxBlockingTasks(maxBlockingTasks int) Option {
 	return func(opts *Options) {
 		opts.MaxBlockingTasks = maxBlockingTasks
 	}
 }
 
-// WithNonblocking indicates that pool will return nil when there is no available workers.
+// WithNonblocking表示在没有可用工作程序时，池将返回nil。
 func WithNonblocking(nonblocking bool) Option {
 	return func(opts *Options) {
 		opts.Nonblocking = nonblocking
 	}
 }
 
-// WithPanicHandler sets up panic handler.
+// WithPanicHandler设置紧急处理程序。
 func WithPanicHandler(panicHandler func(interface{})) Option {
 	return func(opts *Options) {
 		opts.PanicHandler = panicHandler
 	}
 }
 
-// Submit submits a task to pool.
+// Submit将任务提交到池中。
 func Submit(task func()) error {
 	return defaultAntsPool.Submit(task)
 }
 
-// Running returns the number of the currently running goroutines.
+// Running返回当前正在运行的goroutine的数量。
 func Running() int {
 	return defaultAntsPool.Running()
 }
 
-// Cap returns the capacity of this default pool.
+// Cap返回此默认池的容量。
 func Cap() int {
 	return defaultAntsPool.Cap()
 }
 
-// Free returns the available goroutines to work.
+// Free返回可用的goroutines工作。
 func Free() int {
 	return defaultAntsPool.Free()
 }
 
-// Release Closes the default pool.
+// Release关闭默认池。
 func Release() {
 	defaultAntsPool.Release()
 }
