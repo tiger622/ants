@@ -49,7 +49,7 @@ func main() {
 
 	runTimes := 1000
 
-	// Use the common pool.
+	//使用公共池。
 	var wg sync.WaitGroup
 	syncCalculateSum := func() {
 		demoFunc()
@@ -63,8 +63,8 @@ func main() {
 	fmt.Printf("running goroutines: %d\n", ants.Running())
 	fmt.Printf("finish all tasks.\n")
 
-	// Use the pool with a method,
-	// set 10 to the capacity of goroutine pool and 1 second for expired duration.
+	//使用带有方法的池
+	//将10设置为goroutine池的容量，将1秒钟设置为过期时间。
 	p, _ := ants.NewPoolWithFunc(10, func(i interface{}) {
 		myFunc(i)
 		wg.Done()

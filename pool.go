@@ -1,25 +1,3 @@
-// MIT License
-
-// Copyright (c) 2018 Andy Pan
-
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.
-
 package ants
 
 import (
@@ -30,54 +8,54 @@ import (
 	"github.com/panjf2000/ants/v2/internal"
 )
 
-// Pool accept the tasks from client, it limits the total of goroutines to a given number by recycling goroutines.
+// Pool接受来自客户端的任务，它通过回收goroutine将goroutine的总数限制为给定数目。
 type Pool struct {
-	// capacity of the pool.
+	// 池的容量
 	capacity int32
 
-	// running is the number of the currently running goroutines.
+	// running是当前正在运行的goroutine的数量
 	running int32
 
-	// expiryDuration set the expired time (second) of every worker.
+	// expiryDuration设置每个工作人员的过期时间（秒）
 	expiryDuration time.Duration
 
-	// workers is a slice that store the available workers.
+	// 工人是存储可用工人的切片。
 	workers []*goWorker
 
-	// release is used to notice the pool to closed itself.
+	// release用于通知池自身已关闭
 	release int32
 
-	// lock for synchronous operation.
+	// 锁定以进行同步操作
 	lock sync.Locker
 
-	// cond for waiting to get a idle worker.
+	// 继续等待获取空闲工人
 	cond *sync.Cond
 
-	// once makes sure releasing this pool will just be done for one time.
+	// 一旦确保释放此池将只执行一次。
 	once sync.Once
 
-	// workerCache speeds up the obtainment of the an usable worker in function:retrieveWorker.
+	// workerCache在function：retrieveWorker中加快了可用工人的获取
 	workerCache sync.Pool
 
-	// panicHandler is used to handle panics from each worker goroutine.
-	// if nil, panics will be thrown out again from worker goroutines.
+	// panicHandler用于处理每个工作程序goroutine中的异常。
+	//如果为零，异常将再次从工作人员goroutine中抛出。
 	panicHandler func(interface{})
 
-	// Max number of goroutine blocking on pool.Submit.
-	// 0 (default value) means no such limit.
+	//在pool.Submit上阻止goroutine的最大数量。
+	// 0（默认值）表示没有此限制。
 	maxBlockingTasks int32
 
-	// goroutine already been blocked on pool.Submit
-	// protected by pool.lock
+	// goroutine已在pool.Submit上被阻止
+	//受pool.lock保护
 	blockingNum int32
 
-	// When nonblocking is true, Pool.Submit will never be blocked.
-	// ErrPoolOverload will be returned when Pool.Submit cannot be done at once.
-	// When nonblocking is true, MaxBlockingTasks is inoperative.
+	//当nonblocking为true时，Pool.Submit将永远不会被阻塞。
+	//当无法一次完成Pool.Submit时，将返回ErrPoolOverload。
+	//当非阻塞为true时，MaxBlockingTasks不起作用。
 	nonblocking bool
 }
 
-// Clear expired workers periodically.
+//定期清除过期的工作人员。
 func (p *Pool) periodicallyPurge() {
 	heartbeat := time.NewTicker(p.expiryDuration)
 	defer heartbeat.Stop()
@@ -104,25 +82,25 @@ func (p *Pool) periodicallyPurge() {
 		}
 		p.lock.Unlock()
 
-		// Notify obsolete workers to stop.
-		// This notification must be outside the p.lock, since w.task
-		// may be blocking and may consume a lot of time if many workers
-		// are located on non-local CPUs.
+		//通知过时的工人停止。
+		//此通知必须在p.lock之外，因为w.task
+		//如果有很多工人，可能会阻塞并且可能会花费大量时间
+		//位于非本地CPU上。
 		for i, w := range expiredWorkers {
 			w.task <- nil
 			expiredWorkers[i] = nil
 		}
 
-		// There might be a situation that all workers have been cleaned up(no any worker is running)
-		// while some invokers still get stuck in "p.cond.Wait()",
-		// then it ought to wakes all those invokers.
+		//可能会清理所有工作程序（没有任何工作程序在运行）
+		//虽然某些调用程序仍然卡在“ p.cond.Wait（）”中，
+		//然后应该唤醒所有这些调用者。
 		if p.Running() == 0 {
 			p.cond.Broadcast()
 		}
 	}
 }
 
-// NewPool generates an instance of ants pool.
+// NewPool生成一个蚂蚁池实例。
 func NewPool(size int, options ...Option) (*Pool, error) {
 	if size <= 0 {
 		return nil, ErrInvalidPoolSize
@@ -160,7 +138,7 @@ func NewPool(size int, options ...Option) (*Pool, error) {
 	}
 	p.cond = sync.NewCond(p.lock)
 
-	// Start a goroutine to clean up expired workers periodically.
+	//启动goroutine定期清理过期的工作程序。
 	go p.periodicallyPurge()
 
 	return p, nil
@@ -168,7 +146,7 @@ func NewPool(size int, options ...Option) (*Pool, error) {
 
 //---------------------------------------------------------------------------
 
-// Submit submits a task to this pool.
+//提交将任务提交到该池。
 func (p *Pool) Submit(task func()) error {
 	if atomic.LoadInt32(&p.release) == CLOSED {
 		return ErrPoolClosed
@@ -181,22 +159,22 @@ func (p *Pool) Submit(task func()) error {
 	return nil
 }
 
-// Running returns the number of the currently running goroutines.
+// Running返回当前正在运行的goroutine的数量。
 func (p *Pool) Running() int {
 	return int(atomic.LoadInt32(&p.running))
 }
 
-// Free returns the available goroutines to work.
+// Free返回可用的goroutines工作。
 func (p *Pool) Free() int {
 	return p.Cap() - p.Running()
 }
 
-// Cap returns the capacity of this pool.
+// Cap返回该池的容量。
 func (p *Pool) Cap() int {
 	return int(atomic.LoadInt32(&p.capacity))
 }
 
-// Tune changes the capacity of this pool.
+// Tune更改此池的容量。
 func (p *Pool) Tune(size int) {
 	if p.Cap() == size {
 		return
@@ -204,7 +182,7 @@ func (p *Pool) Tune(size int) {
 	atomic.StoreInt32(&p.capacity, int32(size))
 }
 
-// Release Closes this pool.
+// Release关闭此池。
 func (p *Pool) Release() {
 	p.once.Do(func() {
 		atomic.StoreInt32(&p.release, 1)
@@ -221,17 +199,17 @@ func (p *Pool) Release() {
 
 //---------------------------------------------------------------------------
 
-// incRunning increases the number of the currently running goroutines.
+// incRunning增加当前正在运行的goroutine的数量。
 func (p *Pool) incRunning() {
 	atomic.AddInt32(&p.running, 1)
 }
 
-// decRunning decreases the number of the currently running goroutines.
+// decRunning减少当前正在运行的goroutine的数量。
 func (p *Pool) decRunning() {
 	atomic.AddInt32(&p.running, -1)
 }
 
-// retrieveWorker returns a available worker to run the tasks.
+// refreshWorker返回一个可用的工作程序来运行任务。
 func (p *Pool) retrieveWorker() *goWorker {
 	var w *goWorker
 	spawnWorker := func() {
@@ -280,7 +258,7 @@ func (p *Pool) retrieveWorker() *goWorker {
 	return w
 }
 
-// revertWorker puts a worker back into free pool, recycling the goroutines.
+// revertWorker将工作程序放回空闲池，从而回收goroutine。
 func (p *Pool) revertWorker(worker *goWorker) bool {
 	if atomic.LoadInt32(&p.release) == CLOSED || p.Running() > p.Cap() {
 		return false
@@ -289,7 +267,7 @@ func (p *Pool) revertWorker(worker *goWorker) bool {
 	p.lock.Lock()
 	p.workers = append(p.workers, worker)
 
-	// Notify the invoker stuck in 'retrieveWorker()' of there is an available worker in the worker queue.
+	//通知停留在“ retrieveWorker（）”中的调用者该工作队列中有可用的工作程序。
 	p.cond.Signal()
 	p.lock.Unlock()
 	return true

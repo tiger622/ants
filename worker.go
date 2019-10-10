@@ -1,25 +1,3 @@
-// MIT License
-
-// Copyright (c) 2018 Andy Pan
-
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.
-
 package ants
 
 import (
@@ -28,22 +6,22 @@ import (
 	"time"
 )
 
-// goWorker is the actual executor who runs the tasks,
-// it starts a goroutine that accepts tasks and
-// performs function calls.
+// goWorker是执行任务的实际执行者，
+//它启动一个接受任务的goroutine并
+//执行函数调用。
 type goWorker struct {
-	// pool who owns this worker.
+	//拥有此工作人员的池。
 	pool *Pool
 
-	// task is a job should be done.
+	//任务是一项应完成的工作。
 	task chan func()
 
-	// recycleTime will be update when putting a worker back into queue.
+	//将工作者重新放入队列时，recycleTime将被更新
 	recycleTime time.Time
 }
 
-// run starts a goroutine to repeat the process
-// that performs the function calls.
+//运行启动goroutine以重复该过程
+//执行函数调用。
 func (w *goWorker) run() {
 	w.pool.incRunning()
 	go func() {
